@@ -1,0 +1,63 @@
+//---------------------------------------------------------------------------
+#ifndef ServiceControllerH
+#define ServiceControllerH
+//---------------------------------------------------------------------------
+#include <SysUtils.hpp>
+#include <Classes.hpp>
+#include <SvcMgr.hpp>
+#include <vcl.h>
+
+#include "OPCAutomation_TLB.h"
+#include "VaClasses.hpp"
+#include "VaComm.hpp"
+#include <ExtCtrls.hpp>
+
+using namespace Opcautomation_tlb;
+
+typedef IOPCAutoServerPtr _di_IOPCAutoServer;
+typedef IOPCGroupsPtr     _di_IOPCGroups;
+typedef IOPCGroupPtr      _di_IOPCGroup;
+
+// (주의: Items와 Item은 'I'가 빠진 이름으로 생성되었으므로 이렇게 연결합니다)
+typedef OPCItemsPtr       _di_IOPCItems;
+typedef OPCItemPtr        _di_IOPCItem;
+
+//---------------------------------------------------------------------------
+class TGabbianiAgent : public TService
+{
+__published:    // IDE-managed Components
+	TVaComm *MyComm;
+	TTimer *Timer1;
+    void __fastcall ServiceStart(TService *Sender, bool &Started);
+    void __fastcall ServiceStop(TService *Sender, bool &Stopped);
+    void __fastcall Timer1Timer(TObject *Sender);
+private:        // User declarations
+// ★ 여기에 변수를 선언
+// (스마트 포인터 타입 _di_... 사용)
+    _di_IOPCAutoServer OPCServer;
+    _di_IOPCGroups     OPCGroups;
+    _di_IOPCGroup      MyGroup;
+    _di_IOPCItems      MyItems;
+    _di_IOPCItem       ItemStatus;
+    _di_IOPCItem       ItemSpeed;
+public:         // User declarations
+
+
+	bool StartFlag;
+	AnsiString m_LogBuffer;
+
+    // 버퍼에 시간+메시지를 추가하는 내부 함수
+    void __fastcall AddLogToBuffer(AnsiString msg);
+
+    // 실제 파일에 쓰는 함수 (Win32 API 사용)
+    void __fastcall FlushLogToFile();
+    
+	__fastcall TGabbianiAgent(TComponent* Owner);
+	TServiceController __fastcall GetServiceController(void);
+
+	friend void __stdcall ServiceController(unsigned CtrlCode);
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TGabbianiAgent *GabbianiAgent;
+//---------------------------------------------------------------------------
+#endif
