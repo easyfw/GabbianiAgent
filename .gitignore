@@ -1,6 +1,5 @@
 # C++ Builder 실행 파일 및 중간 파일 무시 설정
 *.exe
-*.dll
 *.lib
 *.bpl
 *.obj
@@ -14,7 +13,6 @@
 *.ilf
 *.ils
 *.pdi
-*.pch
 *.local
 *.ident
 *.dsk
