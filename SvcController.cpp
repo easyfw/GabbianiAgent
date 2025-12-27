@@ -1,0 +1,304 @@
+#include <vcl.h>
+#pragma hdrstop
+
+#include "SvcController.h"
+#include <utilcls.h> // TNoParam, TVariant용
+#include <stdio.h>
+#include <objbase.h>
+
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+
+TGabbianiAgent *GabbianiAgent;
+
+// cpp 파일 상단(함수 외부) 또는 LogMessage 함수 내부에 static으로 선언
+static int g_LogFileIndex = 0;   // 파일 번호 관리 (0, 1, 2...)
+static bool g_bFirstRun = true;  // ★ 서비스 시작 후 첫 로그인지 확인하는 플래그
+
+//---------------------------------------------------------------------------
+__fastcall TGabbianiAgent::TGabbianiAgent(TComponent* Owner)
+    : TService(Owner)
+{
+    this->OnStart = ServiceStart;
+    this->OnStop  = ServiceStop;
+    lstrcpy(gbuf,"[GabbianiAgent Service Log]\r\n");
+}
+
+//---------------------------------------------------------------------------
+
+TServiceController __fastcall TGabbianiAgent::GetServiceController(void)
+{
+    return (TServiceController) ServiceController;
+}
+
+void __stdcall ServiceController(unsigned CtrlCode)
+{
+    GabbianiAgent->Controller(CtrlCode);
+}
+
+//---------------------------------------------------------------------------
+void __fastcall TGabbianiAgent::LogMessage(String msg)
+{
+    HANDLE hFile;
+    DWORD dwBytesWritten;
+    DWORD dwFileSize;
+    SYSTEMTIME st;
+    String logFileName;
+    
+    // 로그 파일 기본 경로 (필요에 따라 수정)
+    String logBasePath = "E:\\GabbianiAgent\\Gabbiani_Log"; 
+
+    while (true)
+    {
+        // 1. 파일 이름 생성 (인덱스 반영)
+        if (g_LogFileIndex == 0)
+            logFileName = logBasePath + ".txt";
+        else
+            logFileName = logBasePath + "_" + IntToStr(g_LogFileIndex) + ".txt";
+
+        // 2. 파일 열기 (없으면 생성, 있으면 열기)
+        hFile = CreateFile(
+            logFileName.c_str(),
+            GENERIC_WRITE,
+            FILE_SHARE_READ,
+            NULL,
+            OPEN_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL
+        );
+
+        if (hFile == INVALID_HANDLE_VALUE) return; // 실패 시 종료
+
+        // 3. 파일 크기 체크 (60,000 바이트 제한)
+        dwFileSize = GetFileSize(hFile, NULL);
+
+        if (dwFileSize > 60000)
+        {
+            // 용량 초과 시: 핸들 닫고, 번호 증가 후 루프 다시 실행 (새 파일 찾기)
+            CloseHandle(hFile);
+            g_LogFileIndex++;
+            
+            // ★ 파일이 바뀌면 "첫 실행" 플래그는 의미가 없으므로 꺼줍니다.
+            // (새 파일 맨 위에 빈 줄이 들어가는 것을 방지)
+            g_bFirstRun = false; 
+            continue; 
+        }
+
+        // 적절한 파일을 찾음
+        break; 
+    }
+
+    // 4. 파일 포인터를 맨 끝으로 이동
+    SetFilePointer(hFile, 0, NULL, FILE_END);
+
+    // ★★★ [추가된 기능] 서비스 재시작 후 첫 로그라면 빈 줄 추가 ★★★
+    if (g_bFirstRun)
+    {
+        // 파일에 내용이 있을 때만 빈 줄을 추가 (새 파일이면 빈 줄 불필요)
+        if (dwFileSize > 0)
+        {
+            String blankLine = "\r\n";
+            WriteFile(hFile, blankLine.c_str(), blankLine.Length(), &dwBytesWritten, NULL);
+        }
+        g_bFirstRun = false; // 이제 첫 로그가 아니므로 플래그 해제
+    }
+
+    // 5. 현재 시간 및 로그 메시지 포맷팅
+    GetLocalTime(&st);
+    String timeStr;
+    timeStr.printf("[%04d-%02d-%02d %02d:%02d:%02d] ", 
+                   st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+    
+    AnsiString finalMsg = timeStr + msg + "\r\n";
+
+    // 6. 데이터 쓰기
+    WriteFile(hFile, finalMsg.c_str(), finalMsg.Length(), &dwBytesWritten, NULL);
+
+    // 7. 핸들 닫기
+    CloseHandle(hFile);
+}
+//---------------------------------------------------------------------------
+//
+void __fastcall TGabbianiAgent::ServiceStart(TService *Sender, bool &Started)
+{
+    // 1. COM 초기화
+    CoInitialize(NULL);
+
+    LogMessage("=== Service Starting (VM Mode Check) ===");
+    Started = true; // 일단 true로 시작 (중간에 에러나도 죽지 않게)
+
+    try
+    {
+        try
+        {
+            LogMessage("Step 1: Init Serial Port (COM17)...");
+            MyComm = new TVaComm(NULL);
+            MyComm->PortNum = 17;
+            MyComm->Baudrate = br115200;
+            MyComm->Open();
+            LogMessage("Success: Serial Port Opened.");
+        }
+        catch (Exception &e)
+        {
+            LogMessage("Warning: Serial Port Failed -> " + e.Message);
+            // 시리얼 실패해도 일단 서비스는 띄워봅니다.
+        }
+
+        // ---------------------------------------------------------
+        // 2. OPC 서버 연결 (VMware라 없을 수 있음 -> 에러 무시 처리)
+        // ---------------------------------------------------------
+        try
+        {
+            LogMessage("Step 2: Connecting to OPC Server...");
+            
+#if	0
+            OPCServer = CoOPCServer::Create();
+            OPCServer->Connect(WideString("Schneider-Aut.OFS"), TNoParam());
+            LogMessage("Success: OPC Server Connected.");
+
+            // 그룹 및 아이템 등록
+            OPCGroups = OPCServer->OPCGroups;
+            IOPCGroup *tempGroup = NULL;
+            OPCGroups->Add(TVariant(WideString("GabbianiGroup")), &tempGroup);
+            MyGroup = tempGroup; 
+            
+            MyItems = MyGroup->OPCItems;
+            
+            OPCItem *tempItem1 = NULL;
+            OPCItem *tempItem2 = NULL;
+
+            MyItems->AddItem(WideString("SS!%MW1470"), 1, &tempItem1);
+            MyItems->AddItem(WideString("SS!%MW1461"), 2, &tempItem2);
+
+            ItemStatus = tempItem1;
+            ItemSpeed  = tempItem2;
+ #endif
+            LogMessage("Success: OPC Items Added.");
+        }
+        catch (Exception &e)
+        {
+            // ★★★ 핵심: OPC가 없어도 죽지 않고 로그만 남김 ★★★
+            LogMessage("WARNING: OPC Server Connection Failed (Is OFS installed?)");
+            LogMessage("Detail: " + e.Message);
+        }
+
+        // ---------------------------------------------------------
+        // 3. 타이머 설정
+        // ---------------------------------------------------------
+        if (Timer1 == NULL)
+        {
+            Timer1 = new TTimer(NULL);
+            Timer1->OnTimer = Timer1Timer;
+        }
+        Timer1->Interval = 5000;
+        Timer1->Enabled = true;
+
+        LogMessage("=== Service Started (Partial Mode) ===");
+    }
+    catch (...)
+    {
+        LogMessage("CRITICAL ERROR: Unknown exception in ServiceStart");
+        Started = false; // 정말 알 수 없는 에러일 때만 중단
+    }
+}
+
+//---------------------------------------------------------------------------
+void __fastcall TGabbianiAgent::ServiceStop(TService *Sender, bool &Stopped)
+{
+	LogMessage("=== Service Stopping ===");
+    Timer1->Enabled = false;
+
+    try
+    {
+        if (OPCServer) 
+        {
+            OPCServer->Disconnect();
+            LogMessage("OPC Disconnected.");
+        }
+    }
+    catch (Exception &e) 
+    {
+        LogMessage("Error disconnecting OPC: " + e.Message);
+    }
+
+    if (MyComm)
+    {
+        MyComm->Close();
+        delete MyComm;
+        MyComm = NULL;
+        LogMessage("Serial Port Closed.");
+    }
+
+    CoUninitialize();
+
+    Stopped = true;
+    LogMessage("=== Service Stopped ===");
+}
+
+//
+void __fastcall TGabbianiAgent::Timer1Timer(TObject *Sender)
+{
+    // =========================================================
+    // 1. [수신부] 데이터가 왔는지 먼저 확인 (Polling 방식)
+    // =========================================================
+    if (MyComm && MyComm->Active())
+    {
+        // 입력 버퍼에 쌓인 데이터가 있는지 확인 (ReadBufUsed 등 컴포넌트 속성 활용)
+        // 만약 ReadBufUsed가 없다면 그냥 ReadText()를 호출해도 안전합니다.
+        
+        String rxData = MyComm->ReadText(); // 버퍼 내용 몽땅 읽기
+
+        if (rxData.Length() > 0)
+        {
+            rxData = rxData.Trim(); // 공백/줄바꿈 제거
+            LogMessage("Received from ESP32: " + rxData);
+        }
+    }
+
+    // =========================================================
+    // 2. [송신부] 기존 메시지 전송 코드
+    // =========================================================
+    char tmr_msg[100];
+    static int tcount = 0;
+    
+    // 줄바꿈 문자(\r\n) 포함하여 메시지 생성
+    sprintf(tmr_msg, "%04d Timer Service occurred!!\r\n", ++tcount);
+    
+    // 로컬 로그 기록
+    // LogMessage(tmr_msg); (중복 로그 방지를 위해 송신 로그만 남겨도 됨)
+
+    String sendData = tmr_msg; 
+        
+    if (MyComm && MyComm->Active())
+    {
+        MyComm->WriteText(sendData);
+        LogMessage("Sent: " + sendData.Trim());
+    }
+
+    Timer1->Enabled = true;
+}
+
+//---------------------------------------------------------------------------
+
+
+void __fastcall TGabbianiAgent::MyCommRxChar(TObject *Sender, int Count)
+{
+// 1. 컴포넌트가 실제 존재하는지, 포트가 열려있는지 확인 (안전장치)
+    if (!MyComm || !MyComm->Active()) return;
+
+    // 2. 버퍼에 있는 텍스트 읽어오기
+    String rxData = MyComm->ReadText();
+
+    // 3. 데이터가 비어있지 않은 경우에만 로그 찍기
+    if (rxData.Length() > 0)
+    {
+        // 불필요한 공백이나 줄바꿈(\r\n) 제거
+        rxData = rxData.Trim(); 
+        
+        // 로그 출력
+        LogMessage("Received: " + rxData);
+    }
+}
+//---------------------------------------------------------------------------
+

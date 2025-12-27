@@ -1,8 +1,8 @@
 object GabbianiAgent: TGabbianiAgent
   OldCreateOrder = False
   DisplayName = 'Gabbiani Data Agent'
-  Left = 1050
-  Top = 348
+  Left = 298
+  Top = 175
   Height = 150
   Width = 215
   object MyComm: TVaComm
@@ -15,13 +15,14 @@ object GabbianiAgent: TGabbianiAgent
     FlowControl.DsrSensitivity = False
     FlowControl.TxContinueOnXoff = False
     DeviceName = 'COM%d'
+    OnRxChar = MyCommRxChar
     Version = '1.3.5.0'
     Left = 56
     Top = 32
   end
   object Timer1: TTimer
     OnTimer = Timer1Timer
-    Left = 104
-    Top = 32
+    Left = 144
+    Top = 40
   end
 end

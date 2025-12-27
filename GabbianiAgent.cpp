@@ -2,7 +2,7 @@
 #include <SvcMgr.hpp>
 #pragma hdrstop
 #define Application Svcmgr::Application
-USEFORM("ServiceController.cpp", GabbianiAgent); /* TService: File Type */
+USEFORM("SvcController.cpp", GabbianiAgent); /* TService: File Type */
 //---------------------------------------------------------------------------
 WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {

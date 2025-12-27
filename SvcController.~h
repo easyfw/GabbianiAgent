@@ -1,6 +1,6 @@
 //---------------------------------------------------------------------------
-#ifndef ServiceControllerH
-#define ServiceControllerH
+#ifndef SvcControllerH
+#define SvcControllerH
 //---------------------------------------------------------------------------
 #include <SysUtils.hpp>
 #include <Classes.hpp>
@@ -31,6 +31,7 @@ __published:    // IDE-managed Components
     void __fastcall ServiceStart(TService *Sender, bool &Started);
     void __fastcall ServiceStop(TService *Sender, bool &Stopped);
     void __fastcall Timer1Timer(TObject *Sender);
+	void __fastcall MyCommRxChar(TObject *Sender, int Count);
 private:        // User declarations
 // ★ 여기에 변수를 선언
 // (스마트 포인터 타입 _di_... 사용)
@@ -40,18 +41,12 @@ private:        // User declarations
     _di_IOPCItems      MyItems;
     _di_IOPCItem       ItemStatus;
     _di_IOPCItem       ItemSpeed;
+    void __fastcall LogMessage(String msg);
+
 public:         // User declarations
 
+	TCHAR gbuf[65535];
 
-	bool StartFlag;
-	AnsiString m_LogBuffer;
-
-    // 버퍼에 시간+메시지를 추가하는 내부 함수
-    void __fastcall AddLogToBuffer(AnsiString msg);
-
-    // 실제 파일에 쓰는 함수 (Win32 API 사용)
-    void __fastcall FlushLogToFile();
-    
 	__fastcall TGabbianiAgent(TComponent* Owner);
 	TServiceController __fastcall GetServiceController(void);
 
