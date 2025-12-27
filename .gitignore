@@ -15,5 +15,6 @@
 *.local
 *.ident
 *.dsk
+*.~*
 __history/
 __recovery/
