@@ -4,13 +4,13 @@
   <MACROS>
     <VERSION value="BCB.06.00"/>
     <PROJECT value="GabbianiAgent.exe"/>
-    <OBJFILES value="GabbianiAgent.obj ServiceController.obj 
+    <OBJFILES value="GabbianiAgent.obj SvcController.obj 
       C:\Borland\CBuilder6\Imports\OPCAutomation_TLB.obj"/>
     <RESFILES value="GabbianiAgent.res"/>
     <IDLFILES value=""/>
     <IDLGENFILES value=""/>
     <DEFFILE value=""/>
-    <RESDEPEN value="$(RESFILES) ServiceController.dfm"/>
+    <RESDEPEN value="$(RESFILES) SvcController.dfm"/>
     <LIBFILES value=""/>
     <LIBRARIES value="vacommb6.lib rtl.lib vcl.lib"/>
     <SPARELIBS value="vcl.lib rtl.lib vacommb6.lib"/>
@@ -59,7 +59,7 @@
   <FILELIST>
       <FILE FILENAME="GabbianiAgent.res" FORMNAME="" UNITNAME="GabbianiAgent.res" CONTAINERID="ResTool" DESIGNCLASS="" LOCALCOMMAND=""/>
       <FILE FILENAME="GabbianiAgent.cpp" FORMNAME="" UNITNAME="GabbianiAgent" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
-      <FILE FILENAME="ServiceController.cpp" FORMNAME="GabbianiAgent" UNITNAME="ServiceController" CONTAINERID="CCompiler" DESIGNCLASS="TService" LOCALCOMMAND=""/>
+      <FILE FILENAME="SvcController.cpp" FORMNAME="GabbianiAgent" UNITNAME="SvcController" CONTAINERID="CCompiler" DESIGNCLASS="TService" LOCALCOMMAND=""/>
       <FILE FILENAME="C:\Borland\CBuilder6\Imports\OPCAutomation_TLB.cpp" FORMNAME="" UNITNAME="OPCAutomation_TLB" CONTAINERID="CCompiler" DESIGNCLASS="" LOCALCOMMAND=""/>
   </FILELIST>
   <BUILDTOOLS>
